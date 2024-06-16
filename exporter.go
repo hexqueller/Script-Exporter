@@ -4,12 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
 	"log"
+	"os"
 )
 
 type Config struct {
-	Jobs map[string]struct {
+	Jobs []struct {
 		Name   string `yaml:"name"`
 		Cron   string `yaml:"cron"`
 		Script string `yaml:"script"`
@@ -26,7 +26,7 @@ func main() {
 	fmt.Println(fmt.Sprintf("Config: %s", *configPath))
 	fmt.Println("")
 	// читаем файл YAML
-	data, err := ioutil.ReadFile(*configPath)
+	data, err := os.ReadFile(*configPath)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}

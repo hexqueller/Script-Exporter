@@ -1,9 +1,7 @@
 jobs:
-  job1:
-    name: job1
+  - name: bash script
     cron: "* * * * *"
     script: /path/to/script1.sh
-  job2:
-    name: job2
+  - name: python script
     cron: "0 0 * * *"
-    script: /path/to/script2.sh
+    script: /path/to/script2.py
