@@ -1,7 +1,4 @@
 jobs:
   - name: bash script
     cron: "* * * * *"
-    script: /path/to/script1.sh
-  - name: python script
-    cron: "0 0 * * *"
-    script: /path/to/script2.py
+    script: /home/kreet/work/GoProjects/script-exporter/script.sh

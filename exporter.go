@@ -6,6 +6,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"log"
 	"os"
+	"os/exec"
 )
 
 type Config struct {
@@ -24,7 +25,8 @@ func main() {
 
 	fmt.Println(fmt.Sprintf("Listening on http://localhost:%d", *port))
 	fmt.Println(fmt.Sprintf("Config: %s", *configPath))
-	fmt.Println("")
+	fmt.Println()
+
 	// читаем файл YAML
 	data, err := os.ReadFile(*configPath)
 	if err != nil {
@@ -38,11 +40,21 @@ func main() {
 		log.Fatalf("error: %v", err)
 	}
 
-	// выводим все полученные задания
+	// выполняем все полученные задания
 	for _, job := range config.Jobs {
 		fmt.Printf("Job: %s\n", job.Name)
-		fmt.Printf("Cron: %s\n", job.Cron)
-		fmt.Printf("Script: %s\n", job.Script)
+		//fmt.Printf("Cron: %s\n", job.Cron)
+		//fmt.Printf("Script: %s\n", job.Script)
+
+		// выполняем скрипт
+		cmd := exec.Command(job.Script)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err := cmd.Run()
+		if err != nil {
+			log.Fatalf("error running script: %v", err)
+		}
+
 		fmt.Println()
 	}
 }
