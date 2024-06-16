@@ -3,9 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/robfig/cron/v3"
 	"gopkg.in/yaml.v2"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 )
@@ -17,6 +20,15 @@ type Config struct {
 		Script string `yaml:"script"`
 	} `yaml:"jobs"`
 }
+
+// метрика для результата выполнения скрипта
+var scriptResult = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "script_result",
+		Help: "Result of script execution",
+	},
+	[]string{"job"},
+)
 
 func main() {
 	// получаем аргументы
@@ -42,14 +54,15 @@ func main() {
 		log.Fatalf("error: %v", err)
 	}
 
+	// регистрируем метрику
+	prometheus.MustRegister(scriptResult)
+
 	// создаем планировщик
 	cron := cron.New()
 
 	// добавляем задания в планировщик
 	for _, job := range config.Jobs {
 		_, err := cron.AddFunc(job.Cron, func() {
-			fmt.Printf("Running job %s\n", job.Name)
-
 			// выполняем скрипт
 			cmd := exec.Command(job.Script)
 			cmd.Stdout = os.Stdout
@@ -57,6 +70,9 @@ func main() {
 			err := cmd.Run()
 			if err != nil {
 				log.Printf("error running script: %v", err)
+				scriptResult.WithLabelValues(job.Name).Set(0)
+			} else {
+				scriptResult.WithLabelValues(job.Name).Set(1)
 			}
 		})
 		if err != nil {
@@ -64,9 +80,10 @@ func main() {
 		}
 	}
 
-	// запускаем планировщик
-	cron.Start()
+	// запускаем планировщик в горутине
+	go cron.Start()
 
-	// ждем завершения программы
-	select {}
+	// создаем HTTP-сервер
+	http.Handle("/metrics", promhttp.Handler())
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
 }
