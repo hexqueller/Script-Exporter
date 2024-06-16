@@ -1,0 +1,9 @@
+jobs:
+  job1:
+    name: job1
+    cron: "* * * * *"
+    script: /path/to/script1.sh
+  job2:
+    name: job2
+    cron: "0 0 * * *"
+    script: /path/to/script2.sh
