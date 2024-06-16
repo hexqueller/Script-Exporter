@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/robfig/cron/v3"
 	"gopkg.in/yaml.v2"
 	"log"
 	"os"
@@ -18,6 +19,7 @@ type Config struct {
 }
 
 func main() {
+	// получаем аргументы
 	port := flag.Int("p", 9105, "Port to listen on")
 	configPath := flag.String("c", "default.yaml", "Path to config file")
 
@@ -40,21 +42,31 @@ func main() {
 		log.Fatalf("error: %v", err)
 	}
 
-	// выполняем все полученные задания
+	// создаем планировщик
+	cron := cron.New()
+
+	// добавляем задания в планировщик
 	for _, job := range config.Jobs {
-		fmt.Printf("Job: %s\n", job.Name)
-		//fmt.Printf("Cron: %s\n", job.Cron)
-		//fmt.Printf("Script: %s\n", job.Script)
+		_, err := cron.AddFunc(job.Cron, func() {
+			fmt.Printf("Running job %s\n", job.Name)
 
-		// выполняем скрипт
-		cmd := exec.Command(job.Script)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err := cmd.Run()
+			// выполняем скрипт
+			cmd := exec.Command(job.Script)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			err := cmd.Run()
+			if err != nil {
+				log.Printf("error running script: %v", err)
+			}
+		})
 		if err != nil {
-			log.Fatalf("error running script: %v", err)
+			log.Fatalf("error adding job to cron: %v", err)
 		}
-
-		fmt.Println()
 	}
+
+	// запускаем планировщик
+	cron.Start()
+
+	// ждем завершения программы
+	select {}
 }
