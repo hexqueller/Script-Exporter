@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 type Config struct {
@@ -37,7 +38,7 @@ func main() {
 
 	flag.Parse()
 
-	fmt.Println(fmt.Sprintf("Listening on http://localhost:%d", *port))
+	fmt.Println(fmt.Sprintf("Listening on http://localhost:%d/metrics", *port))
 	fmt.Println(fmt.Sprintf("Config: %s", *configPath))
 	fmt.Println()
 
@@ -65,14 +66,13 @@ func main() {
 		_, err := cron.AddFunc(job.Cron, func() {
 			// выполняем скрипт
 			cmd := exec.Command(job.Script)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			err := cmd.Run()
+			output, err := cmd.CombinedOutput()
 			if err != nil {
 				log.Printf("error running script: %v", err)
-				scriptResult.WithLabelValues(job.Name).Set(0)
-			} else {
 				scriptResult.WithLabelValues(job.Name).Set(1)
+			} else {
+				scriptResult.WithLabelValues(job.Name).Set(0)
+				parseOutput(string(output), job.Name)
 			}
 		})
 		if err != nil {
@@ -86,4 +86,45 @@ func main() {
 	// создаем HTTP-сервер
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
+}
+
+func parseOutput(output string, jobName string) {
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		var (
+			name  string
+			key   string
+			value string
+		)
+
+		// Разбиваем строку на части
+		parts := strings.Split(line, "{")
+		if len(parts) < 2 {
+			log.Printf("Invalid output format: %s", line)
+			continue
+		}
+		name = strings.TrimSpace(parts[0])
+
+		// Разбиваем часть с ключом на части
+		keyParts := strings.Split(parts[1], "=")
+		if len(keyParts) < 2 {
+			log.Printf("Invalid output format: %s", line)
+			continue
+		}
+		key = strings.TrimSpace(strings.Trim(keyParts[0], "\""))
+		value = strings.TrimSpace(keyParts[1][:len(keyParts[1])-1]) // удаляем закрывающую скобку
+
+		// Разбиваем значение на части
+		valueParts := strings.Split(line, "}")
+		if len(valueParts) < 2 {
+			log.Printf("Invalid output format: %s", line)
+			continue
+		}
+		value = strings.TrimSpace(valueParts[1])
+
+		fmt.Println("Name:", name)
+		fmt.Println("Key:", key)
+		fmt.Println("Value:", value)
+		fmt.Println()
+	}
 }

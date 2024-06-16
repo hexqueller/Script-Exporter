@@ -1,4 +1,7 @@
 jobs:
-  - name: bash script
+  - name: single line script
     cron: "* * * * *"
     script: /home/kreet/work/GoProjects/script-exporter/script.sh
+  - name: multi line script
+    cron: "* * * * *"
+    script: /home/kreet/work/GoProjects/script-exporter/multi_line_script.sh
