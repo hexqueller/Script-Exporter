@@ -102,13 +102,13 @@ func executeScriptAndUpdateMetrics(jobName string, script string) {
 		outputs = strings.Split(string(output), "\n")
 		for _, out := range outputs {
 			if len(out) > 0 {
-				updateMetrics(parseOutput(out), jobName)
+				updateMetrics(parseOutput(out, jobName), jobName)
 			}
 		}
 	}
 }
 
-func parseOutput(output string) map[string]Output {
+func parseOutput(output string, jobName string) map[string]Output {
 	result := make(map[string]Output)
 	line := strings.TrimSpace(strings.ReplaceAll(output, "\r", ""))
 	if len(line) == 0 {
@@ -119,6 +119,7 @@ func parseOutput(output string) map[string]Output {
 	closeBrace := strings.Index(line, "}")
 	if openBrace == -1 || closeBrace == -1 {
 		log.Printf("Invalid output format: %s", line)
+		scriptResult.WithLabelValues(jobName).Set(1)
 		return result
 	}
 
@@ -128,6 +129,7 @@ func parseOutput(output string) map[string]Output {
 	keyValueParts := strings.SplitN(keyValue, "=", 2)
 	if len(keyValueParts) != 2 {
 		log.Printf("Invalid output format: %s", line)
+		scriptResult.WithLabelValues(jobName).Set(1)
 		return result
 	}
 	key := strings.TrimSpace(keyValueParts[0])
@@ -159,6 +161,7 @@ func updateMetrics(metrics map[string]Output, jobName string) {
 			val, err := strconv.ParseFloat(outCopy.Value, 64)
 			if err != nil {
 				log.Printf("error parsing value to float64: %v", err)
+				scriptResult.WithLabelValues(jobName).Set(1)
 				return
 			}
 			metric.WithLabelValues(outCopy.KeyValue).Set(val)
