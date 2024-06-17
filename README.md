@@ -23,6 +23,10 @@ go get -d -v gopkg.in/yaml.v2
 ```bash
 go build exporter.go
 ```
+4. Если надо собрать игнорируя glibc:
+```bash
+CGO_ENABLED=0 go build -o exporter exporter.go
+```
 5. Конфигурация
 ```yaml
 jobs:
