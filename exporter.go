@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -141,6 +142,36 @@ func parseOutput(output string) map[string]Output {
 func updateMetrics(metrics map[string]Output, jobName string) {
 	for _, out := range metrics {
 		fmt.Println(out.Name, out.Key, out.KeyValue, out.Value)
-		// дальше будет проверка
+		// Try to update the metric
+		metric := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: out.Name,
+			Help: jobName,
+		}, []string{out.Key})
+		if err {
+			// If the metric doesn't exist, create a new one
+			createMetric(out.Name, out.Key, out.KeyValue, out.Value, jobName)
+			continue
+		}
+		// Update the metric value
+		val, err := strconv.ParseFloat(out.Value, 64)
+		if err != nil {
+			log.Printf("error parsing value to float64: %v", err)
+			continue
+		}
+		metric.WithLabelValues(out.KeyValue).Set(val)
 	}
+}
+
+func createMetric(name string, key string, keyValue string, value string, jobName string) {
+	metric := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: name,
+		Help: jobName,
+	}, []string{key})
+	prometheus.MustRegister(metric)
+	val, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		log.Printf("error parsing value to float64: %v", err)
+		return
+	}
+	metric.WithLabelValues(keyValue).Set(val)
 }
