@@ -99,7 +99,7 @@ func executeScriptAndUpdateMetrics(jobName string, script string) {
 		outputs = strings.Split(string(output), "\n")
 		for _, out := range outputs {
 			if len(out) > 0 {
-				updateMetrics(parseOutput(out))
+				updateMetrics(parseOutput(out), jobName)
 			}
 		}
 	}
@@ -138,7 +138,7 @@ func parseOutput(output string) map[string]Output {
 	return result
 }
 
-func updateMetrics(metrics map[string]Output) {
+func updateMetrics(metrics map[string]Output, jobName string) {
 	for _, out := range metrics {
 		fmt.Println(out.Name, out.Key, out.KeyValue, out.Value)
 		// дальше будет проверка
