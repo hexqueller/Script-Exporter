@@ -22,6 +22,13 @@ type Config struct {
 	} `yaml:"jobs"`
 }
 
+type Output struct {
+	Name     string
+	Key      string
+	KeyValue string
+	Value    string
+}
+
 // метрика для результата выполнения скрипта
 var scriptResult = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
@@ -72,7 +79,7 @@ func main() {
 				scriptResult.WithLabelValues(job.Name).Set(1)
 			} else {
 				scriptResult.WithLabelValues(job.Name).Set(0)
-				parseOutput(string(output), job.Name)
+				updateMetrics(parseOutput(string(output)))
 			}
 		})
 		if err != nil {
@@ -88,43 +95,55 @@ func main() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
 }
 
-func parseOutput(output string, jobName string) {
+func parseOutput(output string) map[string]Output {
+	result := make(map[string]Output)
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		var (
-			name  string
-			key   string
-			value string
+			name     string
+			key      string
+			keyValue string
+			value    string
 		)
 
-		// Разбиваем строку на части
-		parts := strings.Split(line, "{")
+		// Split the line into two parts: the metric name and the value
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) < 2 {
+			log.Printf("Invalid output format: %s", line)
+			continue
+		}
+		metricName := parts[0]
+		value = parts[1]
+
+		// Extract the name and key from the metric name
+		parts = strings.SplitN(metricName, "{", 2)
 		if len(parts) < 2 {
 			log.Printf("Invalid output format: %s", line)
 			continue
 		}
 		name = strings.TrimSpace(parts[0])
-
-		// Разбиваем часть с ключом на части
-		keyParts := strings.Split(parts[1], "=")
-		if len(keyParts) < 2 {
+		keyValuePart := strings.TrimSpace(parts[1])
+		keyValuePart = strings.TrimRight(keyValuePart, "}")
+		parts = strings.SplitN(keyValuePart, "=", 2)
+		if len(parts) < 2 {
 			log.Printf("Invalid output format: %s", line)
 			continue
 		}
-		key = strings.TrimSpace(strings.Trim(keyParts[0], "\""))
-		value = strings.TrimSpace(keyParts[1][:len(keyParts[1])-1]) // удаляем закрывающую скобку
+		key = strings.TrimSpace(strings.Trim(parts[0], "\""))
+		keyValue = strings.TrimSpace(strings.Trim(parts[1], "\""))
 
-		// Разбиваем значение на части
-		valueParts := strings.Split(line, "}")
-		if len(valueParts) < 2 {
-			log.Printf("Invalid output format: %s", line)
-			continue
-		}
-		value = strings.TrimSpace(valueParts[1])
+		out := Output{Name: name, Key: key, KeyValue: keyValue, Value: value}
+		// Use a unique key, such as a combination of name and key
+		resultKey := fmt.Sprintf("%s-%s", name, key)
+		result[resultKey] = out
+	}
 
-		fmt.Println("Name:", name)
-		fmt.Println("Key:", key)
-		fmt.Println("Value:", value)
-		fmt.Println()
+	return result
+}
+
+func updateMetrics(metrics map[string]Output) {
+	for key, out := range metrics {
+		fmt.Println(key, out.Name, out.Key, out.KeyValue, out.Value)
+		// process the metrics here
 	}
 }
