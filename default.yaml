@@ -1,7 +1,0 @@
-jobs:
-  - name: single line script
-    cron: "* * * * *"
-    script: ./script.sh
-  - name: multi line script
-    cron: "* * * * *"
-    script: ./multi_line_script.sh
