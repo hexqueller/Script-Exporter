@@ -15,6 +15,8 @@ import (
 	"strings"
 )
 
+var registeredMetrics = make(map[string]*prometheus.GaugeVec)
+
 type Config struct {
 	Jobs []struct {
 		Name   string `yaml:"name"`
@@ -142,23 +144,25 @@ func parseOutput(output string) map[string]Output {
 func updateMetrics(metrics map[string]Output, jobName string) {
 	for _, out := range metrics {
 		fmt.Println(out.Name, out.Key, out.KeyValue, out.Value)
-		// Try to update the metric
-		metric := prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Name: out.Name,
-			Help: jobName,
-		}, []string{out.Key})
-		if err {
-			// If the metric doesn't exist, create a new one
-			createMetric(out.Name, out.Key, out.KeyValue, out.Value, jobName)
-			continue
+		// Бекапим значение
+		outCopy := out
+		// Регаем метрику
+		metric, ok := registeredMetrics[outCopy.Name]
+		if !ok {
+			// Метрика не существует, создаем новую
+			createMetric(outCopy.Name, outCopy.Key, outCopy.KeyValue, outCopy.Value, jobName)
+			// Получаем новую метрику
+			metric, _ = registeredMetrics[outCopy.Name]
 		}
-		// Update the metric value
-		val, err := strconv.ParseFloat(out.Value, 64)
-		if err != nil {
-			log.Printf("error parsing value to float64: %v", err)
-			continue
+		if metric != nil {
+			// Обновляем значение
+			val, err := strconv.ParseFloat(outCopy.Value, 64)
+			if err != nil {
+				log.Printf("error parsing value to float64: %v", err)
+				return
+			}
+			metric.WithLabelValues(outCopy.KeyValue).Set(val)
 		}
-		metric.WithLabelValues(out.KeyValue).Set(val)
 	}
 }
 
@@ -167,6 +171,7 @@ func createMetric(name string, key string, keyValue string, value string, jobNam
 		Name: name,
 		Help: jobName,
 	}, []string{key})
+	registeredMetrics[name] = metric
 	prometheus.MustRegister(metric)
 	val, err := strconv.ParseFloat(value, 64)
 	if err != nil {
