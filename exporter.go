@@ -71,16 +71,7 @@ func main() {
 	// добавляем задания в планировщик
 	for _, job := range config.Jobs {
 		_, err := cron.AddFunc(job.Cron, func() {
-			// выполняем скрипт
-			cmd := exec.Command(job.Script)
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				log.Printf("error running script: %v", err)
-				scriptResult.WithLabelValues(job.Name).Set(1)
-			} else {
-				scriptResult.WithLabelValues(job.Name).Set(0)
-				updateMetrics(parseOutput(string(output)))
-			}
+			executeScriptAndUpdateMetrics(job.Name, job.Script)
 		})
 		if err != nil {
 			log.Fatalf("error adding job to cron: %v", err)
@@ -95,55 +86,61 @@ func main() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
 }
 
+func executeScriptAndUpdateMetrics(jobName string, script string) {
+	// выполняем скрипт
+	cmd := exec.Command(script)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("error running script: %v", err)
+		scriptResult.WithLabelValues(jobName).Set(1)
+	} else {
+		scriptResult.WithLabelValues(jobName).Set(0)
+		var outputs []string
+		outputs = strings.Split(string(output), "\n")
+		for _, out := range outputs {
+			if len(out) > 0 {
+				updateMetrics(parseOutput(out))
+			}
+		}
+	}
+}
+
 func parseOutput(output string) map[string]Output {
 	result := make(map[string]Output)
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		var (
-			name     string
-			key      string
-			keyValue string
-			value    string
-		)
-
-		// Split the line into two parts: the metric name and the value
-		parts := strings.SplitN(line, " ", 2)
-		if len(parts) < 2 {
-			log.Printf("Invalid output format: %s", line)
-			continue
-		}
-		metricName := parts[0]
-		value = parts[1]
-
-		// Extract the name and key from the metric name
-		parts = strings.SplitN(metricName, "{", 2)
-		if len(parts) < 2 {
-			log.Printf("Invalid output format: %s", line)
-			continue
-		}
-		name = strings.TrimSpace(parts[0])
-		keyValuePart := strings.TrimSpace(parts[1])
-		keyValuePart = strings.TrimRight(keyValuePart, "}")
-		parts = strings.SplitN(keyValuePart, "=", 2)
-		if len(parts) < 2 {
-			log.Printf("Invalid output format: %s", line)
-			continue
-		}
-		key = strings.TrimSpace(strings.Trim(parts[0], "\""))
-		keyValue = strings.TrimSpace(strings.Trim(parts[1], "\""))
-
-		out := Output{Name: name, Key: key, KeyValue: keyValue, Value: value}
-		// Use a unique key, such as a combination of name and key
-		resultKey := fmt.Sprintf("%s-%s", name, key)
-		result[resultKey] = out
+	line := strings.TrimSpace(strings.ReplaceAll(output, "\r", ""))
+	if len(line) == 0 {
+		return result
 	}
+
+	openBrace := strings.Index(line, "{")
+	closeBrace := strings.Index(line, "}")
+	if openBrace == -1 || closeBrace == -1 {
+		log.Printf("Invalid output format: %s", line)
+		return result
+	}
+
+	name := strings.TrimSpace(line[:openBrace])
+	keyValue := strings.TrimSpace(line[openBrace+1 : closeBrace])
+	value := strings.TrimSpace(line[closeBrace+1:])
+	keyValueParts := strings.SplitN(keyValue, "=", 2)
+	if len(keyValueParts) != 2 {
+		log.Printf("Invalid output format: %s", line)
+		return result
+	}
+	key := strings.TrimSpace(keyValueParts[0])
+	keyValue = strings.TrimSpace(keyValueParts[1])
+
+	out := Output{Name: name, Key: key, KeyValue: keyValue, Value: value}
+	var resultKey string
+	resultKey = fmt.Sprintf("%s-%s", name, key)
+	result[resultKey] = out
 
 	return result
 }
 
 func updateMetrics(metrics map[string]Output) {
-	for key, out := range metrics {
-		fmt.Println(key, out.Name, out.Key, out.KeyValue, out.Value)
-		// process the metrics here
+	for _, out := range metrics {
+		fmt.Println(out.Name, out.Key, out.KeyValue, out.Value)
+		// дальше будет проверка
 	}
 }
