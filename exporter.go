@@ -131,7 +131,7 @@ func parseOutput(output string) map[string]Output {
 		return result
 	}
 	key := strings.TrimSpace(keyValueParts[0])
-	keyValue = strings.TrimSpace(keyValueParts[1])
+	keyValue = strings.TrimSpace(strings.Trim(keyValueParts[1], "\""))
 
 	out := Output{Name: name, Key: key, KeyValue: keyValue, Value: value}
 	var resultKey string
