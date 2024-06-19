@@ -16,6 +16,7 @@ import (
 )
 
 var registeredMetrics = make(map[string]*prometheus.GaugeVec)
+var activeMetrics = make(map[string]map[string]struct{})
 
 type Config struct {
 	Jobs []struct {
@@ -73,6 +74,7 @@ func main() {
 
 	// добавляем задания в планировщик
 	for _, job := range config.Jobs {
+		job := job
 		_, err := cron.AddFunc(job.Cron, func() {
 			executeScriptAndUpdateMetrics(job.Name, job.Script)
 		})
@@ -90,6 +92,10 @@ func main() {
 }
 
 func executeScriptAndUpdateMetrics(jobName string, script string) {
+	// сохраняем текущий список активных метрик
+	oldActiveMetrics := activeMetrics[jobName]
+	activeMetrics[jobName] = make(map[string]struct{})
+
 	// выполняем скрипт
 	cmd := exec.Command(script)
 	output, err := cmd.CombinedOutput()
@@ -104,6 +110,14 @@ func executeScriptAndUpdateMetrics(jobName string, script string) {
 			if len(out) > 0 {
 				updateMetrics(parseOutput(out, jobName), jobName)
 			}
+		}
+		fmt.Println()
+	}
+
+	// удаляем пропавшие метрики
+	for metricKey := range oldActiveMetrics {
+		if _, exists := activeMetrics[jobName][metricKey]; !exists {
+			deleteMetric(metricKey)
 		}
 	}
 }
@@ -137,15 +151,15 @@ func parseOutput(output string, jobName string) map[string]Output {
 
 	out := Output{Name: name, Key: key, KeyValue: keyValue, Value: value}
 	var resultKey string
-	resultKey = fmt.Sprintf("%s-%s", name, key)
+	resultKey = fmt.Sprintf("%s-%s", name, keyValue)
 	result[resultKey] = out
 
 	return result
 }
 
 func updateMetrics(metrics map[string]Output, jobName string) {
-	for _, out := range metrics {
-		fmt.Println(out.Name, out.Key, out.KeyValue, out.Value)
+	for metricKey, out := range metrics {
+		fmt.Println(fmt.Sprintf("Metric: %s, Key: %s, KeyValue: %s, Value: %s", out.Name, out.Key, out.KeyValue, out.Value))
 		// Бекапим значение
 		outCopy := out
 		// Регаем метрику
@@ -165,6 +179,7 @@ func updateMetrics(metrics map[string]Output, jobName string) {
 				return
 			}
 			metric.WithLabelValues(outCopy.KeyValue).Set(val)
+			activeMetrics[jobName][metricKey] = struct{}{}
 		}
 	}
 }
@@ -182,4 +197,17 @@ func createMetric(name string, key string, keyValue string, value string, jobNam
 		return
 	}
 	metric.WithLabelValues(keyValue).Set(val)
+	activeMetrics[jobName][fmt.Sprintf("%s-%s", name, keyValue)] = struct{}{}
+}
+
+func deleteMetric(metricKey string) {
+	parts := strings.Split(metricKey, "-")
+	if len(parts) != 2 {
+		return
+	}
+	name, keyValue := parts[0], parts[1]
+	metric, ok := registeredMetrics[name]
+	if ok {
+		metric.DeleteLabelValues(keyValue)
+	}
 }
