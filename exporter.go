@@ -96,8 +96,20 @@ func executeScriptAndUpdateMetrics(jobName string, script string) {
 	oldActiveMetrics := activeMetrics[jobName]
 	activeMetrics[jobName] = make(map[string]struct{})
 
-	// выполняем скрипт
-	cmd := exec.Command(script)
+	// определяем тип скрипта на основе расширения файла
+	var cmd *exec.Cmd
+	if strings.HasSuffix(script, ".sh") {
+		// запуск скрипта bash
+		cmd = exec.Command("bash", "-c", script)
+	} else if strings.HasSuffix(script, ".py") {
+		// запуск скрипта Python
+		cmd = exec.Command("python3", script)
+	} else {
+		log.Printf("Unsupported script type: %s", script)
+		scriptResult.WithLabelValues(jobName).Set(1)
+		return
+	}
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("error running script: %v", err)
@@ -185,9 +197,10 @@ func updateMetrics(metrics map[string]Output, jobName string) {
 }
 
 func createMetric(name string, key string, keyValue string, value string, jobName string) {
+	metricsHelp := fmt.Sprintf("Job: %s", jobName)
 	metric := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: name,
-		Help: jobName,
+		Help: metricsHelp,
 	}, []string{key})
 	registeredMetrics[name] = metric
 	prometheus.MustRegister(metric)
@@ -209,5 +222,8 @@ func deleteMetric(metricKey string) {
 	metric, ok := registeredMetrics[name]
 	if ok {
 		metric.DeleteLabelValues(keyValue)
+		log.Printf("Metric deleted: name=%s, keyValue=%s", name, keyValue)
+	} else {
+		log.Printf("Attempted to delete non-existent metric: name=%s, keyValue=%s", name, keyValue)
 	}
 }
