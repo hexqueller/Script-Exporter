@@ -1,0 +1,7 @@
+jobs:
+  - name: sh script
+    cron: "* * * * *"
+    script: scripts/example_script.sh
+  - name: disk script
+    cron: "* * * * *"
+    script: scripts/disk.sh
