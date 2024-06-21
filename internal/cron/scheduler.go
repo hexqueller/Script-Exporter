@@ -12,15 +12,15 @@ func StartScheduler(jobs []struct {
 	Cron   string `yaml:"cron"`
 	Script string `yaml:"script"`
 }) {
-	cron := cron.New()
+	cronInstance := cron.New()
 	for _, job := range jobs {
 		job := job
-		_, err := cron.AddFunc(job.Cron, func() {
+		_, err := cronInstance.AddFunc(job.Cron, func() {
 			script.ExecuteScriptAndUpdateMetrics(job.Name, job.Script)
 		})
 		if err != nil {
 			log.Fatalf("error adding job to cron: %v", err)
 		}
 	}
-	go cron.Start()
+	go cronInstance.Start()
 }
