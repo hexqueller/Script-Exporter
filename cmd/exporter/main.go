@@ -1,11 +1,11 @@
 package main
 
 import (
-	"Script-Exporter/internal/config"
-	"Script-Exporter/internal/cron"
-	"Script-Exporter/internal/metrics"
 	"flag"
 	"fmt"
+	"github.com/hexqueller/Script-Exporter/internal/config"
+	"github.com/hexqueller/Script-Exporter/internal/cron"
+	"github.com/hexqueller/Script-Exporter/internal/metrics"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"net/http"

@@ -1,7 +1,7 @@
 package cron
 
 import (
-	"Script-Exporter/internal/script"
+	"github.com/hexqueller/Script-Exporter/internal/script"
 	"log"
 
 	"github.com/robfig/cron/v3"

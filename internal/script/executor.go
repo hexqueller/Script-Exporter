@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"Script-Exporter/internal/metrics"
+	"github.com/hexqueller/Script-Exporter/internal/metrics"
 )
 
 func ExecuteScriptAndUpdateMetrics(jobName string, script string) {

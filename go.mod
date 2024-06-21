@@ -1,4 +1,4 @@
-module Script-Exporter
+module github.com/hexqueller/Script-Exporter
 
 go 1.22
 
