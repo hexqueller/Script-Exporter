@@ -1,7 +1,9 @@
 #!/bin/bash
-ARRAY_DISK=($(lsblk -b | grep ^sd[a-z][^0-9] | awk '{ print $1 }'))
+
+mapfile -t ARRAY_DISK < <(lsblk -dn -o NAME | grep '^sd[a-z]$')
+
 for element in "${ARRAY_DISK[@]}"
 do
-  size=($(lsblk -b | grep ^$element | awk '{ print $4 }'))
+  size=$(lsblk -dn -o SIZE -b "/dev/$element")
   echo "disk_size_lsblk{disk=\"$element\"} $size"
 done
