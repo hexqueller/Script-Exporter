@@ -3,6 +3,7 @@ package metrics
 import (
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -11,10 +12,9 @@ import (
 
 // Output представляет собой структуру для хранения информации о метрике.
 type Output struct {
-	Name     string
-	Key      string
-	KeyValue string
-	Value    string
+	Name  string
+	Key   map[string]string
+	Value string
 }
 
 var registeredMetrics = make(map[string]*prometheus.GaugeVec)
@@ -36,7 +36,7 @@ func RegisterMetrics() {
 func UpdateMetrics(metrics map[string]Output, jobName string, debug *bool) {
 	for metricKey, out := range metrics {
 		if *debug {
-			fmt.Println(fmt.Sprintf("Metric: %s, Key: %s, KeyValue: %s, Value: %s", out.Name, out.Key, out.KeyValue, out.Value))
+			fmt.Println(fmt.Sprintf("Metric: %s, Key: %v, Value: %s", out.Name, out.Key, out.Value))
 		}
 		// Бекапим значение
 		outCopy := out
@@ -44,7 +44,7 @@ func UpdateMetrics(metrics map[string]Output, jobName string, debug *bool) {
 		metric, ok := registeredMetrics[outCopy.Name]
 		if !ok {
 			// Метрика не существует, создаем новую
-			CreateMetric(outCopy.Name, outCopy.Key, outCopy.KeyValue, outCopy.Value, jobName)
+			CreateMetric(outCopy.Name, outCopy.Key, outCopy.Value, jobName)
 			// Получаем новую метрику
 			metric, _ = registeredMetrics[outCopy.Name]
 		}
@@ -56,18 +56,32 @@ func UpdateMetrics(metrics map[string]Output, jobName string, debug *bool) {
 				scriptResult.WithLabelValues(jobName).Set(1)
 				return
 			}
-			metric.WithLabelValues(outCopy.KeyValue).Set(val)
+			labels := make([]string, 0, len(outCopy.Key))
+			for k := range outCopy.Key {
+				labels = append(labels, k)
+			}
+			sort.Strings(labels)
+			labelValues := make([]string, 0, len(outCopy.Key))
+			for _, label := range labels {
+				labelValues = append(labelValues, outCopy.Key[label])
+			}
+			metric.WithLabelValues(labelValues...).Set(val)
 			activeMetrics[jobName][metricKey] = struct{}{}
 		}
 	}
 }
 
-func CreateMetric(name string, key string, keyValue string, value string, jobName string) {
+func CreateMetric(name string, key map[string]string, value string, jobName string) {
 	metricsHelp := fmt.Sprintf("Job: %s", jobName)
+	labelNames := make([]string, 0, len(key))
+	for k := range key {
+		labelNames = append(labelNames, k)
+	}
+	sort.Strings(labelNames)
 	metric := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: name,
 		Help: metricsHelp,
-	}, []string{key})
+	}, labelNames)
 	registeredMetrics[name] = metric
 	prometheus.MustRegister(metric)
 	val, err := strconv.ParseFloat(value, 64)
@@ -75,22 +89,42 @@ func CreateMetric(name string, key string, keyValue string, value string, jobNam
 		log.Printf("error parsing value to float64: %v", err)
 		return
 	}
-	metric.WithLabelValues(keyValue).Set(val)
-	activeMetrics[jobName][fmt.Sprintf("%s-%s", name, keyValue)] = struct{}{}
+	labels := make([]string, 0, len(key))
+	for _, labelName := range labelNames {
+		labels = append(labels, key[labelName])
+	}
+	metric.WithLabelValues(labels...).Set(val)
+	activeMetrics[jobName][fmt.Sprintf("%s-%v", name, key)] = struct{}{}
 }
 
-func DeleteMetric(metricKey string) {
+func DeleteMetric(jobName string, metricKey string) {
 	parts := strings.Split(metricKey, "-")
 	if len(parts) != 2 {
 		return
 	}
-	name, keyValue := parts[0], parts[1]
+	name, keyValueStr := parts[0], parts[1]
 	metric, ok := registeredMetrics[name]
 	if ok {
-		metric.DeleteLabelValues(keyValue)
-		log.Printf("Metric deleted: name=%s, keyValue=%s", name, keyValue)
+		keyValue := make(map[string]string)
+		pairs := strings.Split(keyValueStr, " ")
+		for _, pair := range pairs {
+			parts := strings.SplitN(pair, "=", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(strings.Trim(parts[1], "\""))
+			keyValue[key] = value
+		}
+		labels := make([]string, 0, len(keyValue))
+		for _, kv := range keyValue {
+			labels = append(labels, kv)
+		}
+		metric.DeleteLabelValues(labels...)
+		log.Printf("Metric deleted: name=%s, keyValue=%v", name, keyValue)
+		delete(activeMetrics[jobName], fmt.Sprintf("%s-%v", name, keyValue))
 	} else {
-		log.Printf("Attempted to delete non-existent metric: name=%s, keyValue=%s", name, keyValue)
+		log.Printf("Attempted to delete non-existent metric: name=%s, keyValue=%s", name, keyValueStr)
 	}
 }
 

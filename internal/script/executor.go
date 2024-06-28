@@ -47,7 +47,7 @@ func ExecuteScriptAndUpdateMetrics(jobName string, script string, debug *bool) {
 	// удаляем пропавшие метрики
 	for metricKey := range oldActiveMetrics {
 		if _, exists := metrics.IsActiveMetric(jobName, metricKey); !exists {
-			metrics.DeleteMetric(metricKey)
+			metrics.DeleteMetric(jobName, metricKey)
 		}
 	}
 }
@@ -70,18 +70,24 @@ func parseOutput(output string, jobName string) map[string]metrics.Output {
 	name := strings.TrimSpace(line[:openBrace])
 	keyValue := strings.TrimSpace(line[openBrace+1 : closeBrace])
 	value := strings.TrimSpace(line[closeBrace+1:])
-	keyValueParts := strings.SplitN(keyValue, "=", 2)
-	if len(keyValueParts) != 2 {
-		log.Printf("Invalid output format: %s", line)
-		metrics.SetScriptResult(jobName, 1)
-		return result
-	}
-	key := strings.TrimSpace(keyValueParts[0])
-	keyValue = strings.TrimSpace(strings.Trim(keyValueParts[1], "\""))
 
-	out := metrics.Output{Name: name, Key: key, KeyValue: keyValue, Value: value}
+	keyValueParts := make(map[string]string)
+	pairs := strings.Split(keyValue, ", ")
+	for _, pair := range pairs {
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) != 2 {
+			log.Printf("Invalid output format: %s", line)
+			metrics.SetScriptResult(jobName, 1)
+			return result
+		}
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(strings.Trim(parts[1], "\""))
+		keyValueParts[key] = value
+	}
+
+	out := metrics.Output{Name: name, Key: keyValueParts, Value: value}
 	var resultKey string
-	resultKey = fmt.Sprintf("%s-%s", name, keyValue)
+	resultKey = fmt.Sprintf("%s-%v", name, keyValueParts)
 	result[resultKey] = out
 
 	return result
