@@ -15,10 +15,11 @@ func main() {
 	// получаем аргументы
 	port := flag.Int("p", 9105, "Port to listen on")
 	configPath := flag.String("c", "configs/default.yaml", "Path to config file")
+	debug := flag.Bool("d", false, "Enable debug mode")
 	flag.Parse()
 
 	fmt.Println(fmt.Sprintf("Listening on http://localhost:%d/metrics", *port))
-	fmt.Println(fmt.Sprintf("Config: %s", *configPath))
+	fmt.Println(fmt.Sprintf("Config: %s, Debug is %t", *configPath, *debug))
 	fmt.Println()
 
 	// читаем и разбираем файл YAML
@@ -31,7 +32,7 @@ func main() {
 	metrics.RegisterMetrics()
 
 	// создаем и запускаем планировщик
-	cron.StartScheduler(cfg.Jobs)
+	cron.StartScheduler(debug, cfg.Jobs)
 
 	// создаем HTTP-сервер
 	http.Handle("/metrics", promhttp.Handler())

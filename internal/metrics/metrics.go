@@ -33,9 +33,11 @@ func RegisterMetrics() {
 	prometheus.MustRegister(scriptResult)
 }
 
-func UpdateMetrics(metrics map[string]Output, jobName string) {
+func UpdateMetrics(metrics map[string]Output, jobName string, debug *bool) {
 	for metricKey, out := range metrics {
-		fmt.Println(fmt.Sprintf("Metric: %s, Key: %s, KeyValue: %s, Value: %s", out.Name, out.Key, out.KeyValue, out.Value))
+		if *debug {
+			fmt.Println(fmt.Sprintf("Metric: %s, Key: %s, KeyValue: %s, Value: %s", out.Name, out.Key, out.KeyValue, out.Value))
+		}
 		// Бекапим значение
 		outCopy := out
 		// Регаем метрику

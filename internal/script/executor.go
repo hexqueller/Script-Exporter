@@ -9,7 +9,7 @@ import (
 	"github.com/hexqueller/Script-Exporter/internal/metrics"
 )
 
-func ExecuteScriptAndUpdateMetrics(jobName string, script string) {
+func ExecuteScriptAndUpdateMetrics(jobName string, script string, debug *bool) {
 	// сохраняем текущий список активных метрик
 	oldActiveMetrics := metrics.GetActiveMetrics(jobName)
 	metrics.ResetActiveMetrics(jobName)
@@ -38,7 +38,7 @@ func ExecuteScriptAndUpdateMetrics(jobName string, script string) {
 		outputs = strings.Split(string(output), "\n")
 		for _, out := range outputs {
 			if len(out) > 0 {
-				metrics.UpdateMetrics(parseOutput(out, jobName), jobName)
+				metrics.UpdateMetrics(parseOutput(out, jobName), jobName, debug)
 			}
 		}
 		fmt.Println()
