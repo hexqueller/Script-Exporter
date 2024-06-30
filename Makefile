@@ -5,3 +5,6 @@ build:
 
 run: build
 	./exporter -d
+
+docker: build
+	docker build . -t script-exporter && docker run -p 9105:9105 script-exporter
