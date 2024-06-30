@@ -21,34 +21,34 @@ git clone https://github.com/hexqueller/Script-Exporter.git
 ```bash
 cd Script-Exporter
 ```
-3. Установить зависимости:
+
+3. Конфигурация
 ```bash
-go get -d -v github.com/prometheus/client_golang/prometheus
-go get -d -v github.com/prometheus/client_golang/prometheus/promhttp
-go get -d -v github.com/robfig/cron/v3
-go get -d -v gopkg.in/yaml.v2
+./configs/default.yaml
 ```
-4. Собрать:
-```bash
-go build cmd/exporter/main.go
-```
-4. Если надо собрать игнорируя glibc:
-```bash
-CGO_ENABLED=0 go build -o exporter cmd/exporter/main.go
-```
-5. Конфигурация
 ```yaml
 jobs:
-  - name: sh script
+  - name: disk script
     cron: "* * * * *"
-    script: /path/to/script1.sh
-  - name: python script
+    script: scripts/disk.sh
+  - name: multi_label
     cron: "0 */2 * * *"
-    script: /path/to/script2.py
+    script: scripts/multi_label.sh
 ```
-В этом примере две джобы: sh script и python script. sh script запускается каждую минуту, а python script каждые 2 часа.
+В этом примере две джобы: disk script и multi_label. disk script запускается каждую минуту, а multi_label каждые 2 часа.
 
-6. Запуск
+4. Способы запуска:
+```bash
+make build # Просто собрать
+```
+```bash
+make run # Собрать и сразу запустить
+```
+```bash
+make docker # Собрать и запустить в Docker
+```
+
+5. О параметрах запуска
 ```bash
 ./exporter -p 9105 -c path/to/config.yaml -d
 ```
