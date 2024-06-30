@@ -99,14 +99,13 @@ func CreateMetric(name string, key map[string]string, value string, jobName stri
 func DeleteMetric(metricName string, labels map[string]string) {
 	metric, ok := registeredMetrics[metricName]
 	if ok {
-		labelValues := make([]string, 0, len(labels))
-		for value := range labels {
-			labelValues = append(labelValues, value)
+		if metric.Delete(labels) {
+			log.Printf("Metric deleted: name=%s, keyValue=%s", metricName, labels)
+		} else {
+			log.Printf("Metric found but labels is invalid: name=%s, keyValue=%s", metricName, labels)
 		}
-		metric.DeleteLabelValues(labelValues...)
-		log.Printf("Metric deleted: name=%s, labels=%v", metricName, labels)
 	} else {
-		log.Printf("Attempted to delete non-existent metric: name=%s, labels=%v", metricName, labels)
+		log.Printf("Attempted to delete non-existent metric: name=%s, keyValue=%s", metricName, labels)
 	}
 }
 
