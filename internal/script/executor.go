@@ -41,13 +41,15 @@ func ExecuteScriptAndUpdateMetrics(jobName string, script string, debug *bool) {
 				metrics.UpdateMetrics(parseOutput(out, jobName), jobName, debug)
 			}
 		}
-		fmt.Println()
+		if *debug {
+			fmt.Println()
+		}
 	}
 
 	// удаляем пропавшие метрики
 	for metricKey := range oldActiveMetrics {
 		if _, exists := metrics.IsActiveMetric(jobName, metricKey); !exists {
-			metrics.DeleteMetric(metrics.ParseMetricToDelete(metricKey))
+			metrics.DeleteMetric(metrics.ParseMetricToDelete(debug, metricKey))
 		}
 	}
 }

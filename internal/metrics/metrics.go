@@ -96,11 +96,13 @@ func CreateMetric(name string, key map[string]string, value string, jobName stri
 	activeMetrics[jobName][fmt.Sprintf("%s-%v", name, key)] = struct{}{}
 }
 
-func DeleteMetric(metricName string, labels map[string]string) {
+func DeleteMetric(debug *bool, metricName string, labels map[string]string) {
 	metric, ok := registeredMetrics[metricName]
 	if ok {
 		if metric.Delete(labels) {
-			log.Printf("Metric deleted: name=%s, keyValue=%s", metricName, labels)
+			if *debug {
+				log.Printf("Metric deleted: name=%s, keyValue=%s", metricName, labels)
+			}
 		} else {
 			log.Printf("Metric found but labels is invalid: name=%s, keyValue=%s", metricName, labels)
 		}
@@ -109,10 +111,10 @@ func DeleteMetric(metricName string, labels map[string]string) {
 	}
 }
 
-func ParseMetricToDelete(metricString string) (string, map[string]string) {
+func ParseMetricToDelete(debug *bool, metricString string) (*bool, string, map[string]string) {
 	parts := strings.Split(metricString, "-map[")
 	if len(parts) != 2 {
-		return "", nil
+		return debug, "", nil
 	}
 
 	metricName := strings.TrimSpace(parts[0])
@@ -129,7 +131,7 @@ func ParseMetricToDelete(metricString string) (string, map[string]string) {
 		labels[keyValue[0]] = keyValue[1]
 	}
 
-	return metricName, labels
+	return debug, metricName, labels
 }
 
 func GetActiveMetrics(jobName string) map[string]struct{} {
