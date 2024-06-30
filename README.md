@@ -5,7 +5,12 @@
 ```bash
 node_exporter_disk_size_lsblk{disk="sda"} 62914560000
 ```
-Где `node_exporter_disk_size_lsblk` - это название метрики, `disk` и `sda` - это лейбл и его ключ, а `62914560000`- это значение
+Где `node_exporter_disk_size_lsblk` - это название метрики, `disk` и `sda` - это лейбл и его ключ, а `62914560000`- это значение \
+
+После обновления `v2.0.0` можно создавать метрики с несколькими лейблами (P.S Без пробелов)
+```bash
+node_exporter_host_info{type="VM", task="Daria", description="ClusterOfK8s", creater="Boris" } 1
+```
 ## Установка из исходников
 
 1. Клонировать репозиторий:
