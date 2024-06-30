@@ -47,7 +47,7 @@ func ExecuteScriptAndUpdateMetrics(jobName string, script string, debug *bool) {
 	// удаляем пропавшие метрики
 	for metricKey := range oldActiveMetrics {
 		if _, exists := metrics.IsActiveMetric(jobName, metricKey); !exists {
-			metrics.DeleteMetric(jobName, metricKey)
+			metrics.DeleteMetric(metrics.ParseMetricToDelete(metricKey))
 		}
 	}
 }
@@ -85,7 +85,7 @@ func parseOutput(output string, jobName string) map[string]metrics.Output {
 		keyValueParts[key] = value
 	}
 
-	out := metrics.Output{Name: name, Key: keyValueParts, Value: value}
+	out := metrics.Output{Name: name, Labels: keyValueParts, Value: value}
 	var resultKey string
 	resultKey = fmt.Sprintf("%s-%v", name, keyValueParts)
 	result[resultKey] = out

@@ -2,19 +2,18 @@ package metrics
 
 import (
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"log"
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Output представляет собой структуру для хранения информации о метрике.
 type Output struct {
-	Name  string
-	Key   map[string]string
-	Value string
+	Name   string
+	Labels map[string]string
+	Value  string
 }
 
 var registeredMetrics = make(map[string]*prometheus.GaugeVec)
@@ -36,7 +35,7 @@ func RegisterMetrics() {
 func UpdateMetrics(metrics map[string]Output, jobName string, debug *bool) {
 	for metricKey, out := range metrics {
 		if *debug {
-			fmt.Println(fmt.Sprintf("Metric: %s, Key: %v, Value: %s", out.Name, out.Key, out.Value))
+			fmt.Println(fmt.Sprintf("Metric: %s, Labels: %v, Value: %s", out.Name, out.Labels, out.Value))
 		}
 		// Бекапим значение
 		outCopy := out
@@ -44,7 +43,7 @@ func UpdateMetrics(metrics map[string]Output, jobName string, debug *bool) {
 		metric, ok := registeredMetrics[outCopy.Name]
 		if !ok {
 			// Метрика не существует, создаем новую
-			CreateMetric(outCopy.Name, outCopy.Key, outCopy.Value, jobName)
+			CreateMetric(outCopy.Name, outCopy.Labels, outCopy.Value, jobName)
 			// Получаем новую метрику
 			metric, _ = registeredMetrics[outCopy.Name]
 		}
@@ -56,14 +55,14 @@ func UpdateMetrics(metrics map[string]Output, jobName string, debug *bool) {
 				scriptResult.WithLabelValues(jobName).Set(1)
 				return
 			}
-			labels := make([]string, 0, len(outCopy.Key))
-			for k := range outCopy.Key {
+			labels := make([]string, 0, len(outCopy.Labels))
+			for k := range outCopy.Labels {
 				labels = append(labels, k)
 			}
 			sort.Strings(labels)
-			labelValues := make([]string, 0, len(outCopy.Key))
+			labelValues := make([]string, 0, len(outCopy.Labels))
 			for _, label := range labels {
-				labelValues = append(labelValues, outCopy.Key[label])
+				labelValues = append(labelValues, outCopy.Labels[label])
 			}
 			metric.WithLabelValues(labelValues...).Set(val)
 			activeMetrics[jobName][metricKey] = struct{}{}
@@ -97,35 +96,41 @@ func CreateMetric(name string, key map[string]string, value string, jobName stri
 	activeMetrics[jobName][fmt.Sprintf("%s-%v", name, key)] = struct{}{}
 }
 
-func DeleteMetric(jobName string, metricKey string) {
-	parts := strings.Split(metricKey, "-")
-	if len(parts) != 2 {
-		return
-	}
-	name, keyValueStr := parts[0], parts[1]
-	metric, ok := registeredMetrics[name]
+func DeleteMetric(metricName string, labels map[string]string) {
+	metric, ok := registeredMetrics[metricName]
 	if ok {
-		keyValue := make(map[string]string)
-		pairs := strings.Split(keyValueStr, " ")
-		for _, pair := range pairs {
-			parts := strings.SplitN(pair, "=", 2)
-			if len(parts) != 2 {
-				continue
-			}
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(strings.Trim(parts[1], "\""))
-			keyValue[key] = value
+		labelValues := make([]string, 0, len(labels))
+		for value := range labels {
+			labelValues = append(labelValues, value)
 		}
-		labels := make([]string, 0, len(keyValue))
-		for _, kv := range keyValue {
-			labels = append(labels, kv)
-		}
-		metric.DeleteLabelValues(labels...)
-		log.Printf("Metric deleted: name=%s, keyValue=%v", name, keyValue)
-		delete(activeMetrics[jobName], fmt.Sprintf("%s-%v", name, keyValue))
+		metric.DeleteLabelValues(labelValues...)
+		log.Printf("Metric deleted: name=%s, labels=%v", metricName, labels)
 	} else {
-		log.Printf("Attempted to delete non-existent metric: name=%s, keyValue=%s", name, keyValueStr)
+		log.Printf("Attempted to delete non-existent metric: name=%s, labels=%v", metricName, labels)
 	}
+}
+
+func ParseMetricToDelete(metricString string) (string, map[string]string) {
+	parts := strings.Split(metricString, "-map[")
+	if len(parts) != 2 {
+		return "", nil
+	}
+
+	metricName := strings.TrimSpace(parts[0])
+	labelsStr := strings.TrimSpace(parts[1])
+	labelsStr = strings.Trim(labelsStr, "]")
+	labelParts := strings.Split(labelsStr, " ")
+
+	labels := make(map[string]string)
+	for _, labelPart := range labelParts {
+		keyValue := strings.Split(labelPart, ":")
+		if len(keyValue) != 2 {
+			continue
+		}
+		labels[keyValue[0]] = keyValue[1]
+	}
+
+	return metricName, labels
 }
 
 func GetActiveMetrics(jobName string) map[string]struct{} {

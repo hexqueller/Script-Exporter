@@ -1,7 +1,7 @@
-.PHONY: run
-run:
-	go run cmd/exporter/main.go
+.SILENT:
 
-.PHONY: build
 build:
-	go build -o exporter cmd/exporter/main.go
+	go mod download && CGO_ENABLED=0 GOOS=linux go build -o exporter cmd/exporter/main.go
+
+run: build
+	./exporter -d
