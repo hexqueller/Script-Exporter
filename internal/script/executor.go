@@ -1,10 +1,12 @@
 package script
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os/exec"
 	"strings"
+	"syscall"
 
 	"github.com/hexqueller/Script-Exporter/internal/metrics"
 )
@@ -30,7 +32,16 @@ func ExecuteScriptAndUpdateMetrics(jobName string, script string, debug *bool) {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Printf("error running script: %v", err)
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
+				if status.ExitStatus() == 126 {
+					log.Printf("error running script (126). Maybe forgot: Chmod +x?")
+				} else {
+					log.Printf("error running script: %v", err)
+				}
+			}
+		}
 		metrics.SetScriptResult(jobName, 1)
 	} else {
 		metrics.SetScriptResult(jobName, 0)
