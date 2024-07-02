@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Output представляет собой структуру для хранения информации о метрике.
@@ -18,6 +19,9 @@ type Output struct {
 
 var registeredMetrics = make(map[string]*prometheus.GaugeVec)
 var activeMetrics = make(map[string]map[string]struct{})
+
+var activeMetricsLock sync.Mutex
+var registeredMetricsLock sync.Mutex
 
 // метрика для результата выполнения скрипта
 var scriptResult = prometheus.NewGaugeVec(
@@ -33,6 +37,12 @@ func RegisterMetrics() {
 }
 
 func UpdateMetrics(metrics map[string]Output, jobName string, debug *bool) {
+	registeredMetricsLock.Lock()
+	defer registeredMetricsLock.Unlock()
+
+	activeMetricsLock.Lock()
+	defer activeMetricsLock.Unlock()
+
 	for metricKey, out := range metrics {
 		if *debug {
 			fmt.Println(fmt.Sprintf("Metric: %s, Labels: %v, Value: %s", out.Name, out.Labels, out.Value))
@@ -135,10 +145,14 @@ func ParseMetricToDelete(debug *bool, metricString string) (*bool, string, map[s
 }
 
 func GetActiveMetrics(jobName string) map[string]struct{} {
+	activeMetricsLock.Lock()
+	defer activeMetricsLock.Unlock()
 	return activeMetrics[jobName]
 }
 
 func ResetActiveMetrics(jobName string) {
+	activeMetricsLock.Lock()
+	defer activeMetricsLock.Unlock()
 	activeMetrics[jobName] = make(map[string]struct{})
 }
 
@@ -147,6 +161,8 @@ func SetScriptResult(jobName string, result float64) {
 }
 
 func IsActiveMetric(jobName, metricKey string) (struct{}, bool) {
+	activeMetricsLock.Lock()
+	defer activeMetricsLock.Unlock()
 	val, exists := activeMetrics[jobName][metricKey]
 	return val, exists
 }
