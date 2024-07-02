@@ -37,6 +37,9 @@ func ExecuteScriptAndUpdateMetrics(jobName string, script string, debug *bool) {
 			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
 				if status.ExitStatus() == 126 {
 					log.Printf("error running script (126). Maybe forgot: Chmod +x?")
+				}
+				if status.ExitStatus() == 127 {
+					log.Printf("error running script (127). Invalid path!")
 				} else {
 					log.Printf("error running script: %v", err)
 				}
